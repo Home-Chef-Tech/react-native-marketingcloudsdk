@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.license          = package['license']
   s.author           = package['author']
   s.platform         = :ios, "11.0"
-  s.source           = { :git => "https://github.com/salesforce-marketingcloud/react-native-marketingcloudsdk.git", :tag => "master" }
+  s.source           = { :git => "https://github.com/Home-Chef-Tech/react-native-marketingcloudsdk.git", :tag => "master" }
   s.source_files     = "ios/**/*.{h,m}"
   s.requires_arc     = true
 
