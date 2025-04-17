@@ -1,6 +1,4 @@
 import React, {useState, useEffect} from 'react';
-import {PermissionsAndroid} from 'react-native';
-
 import {
   View,
   TextInput,
@@ -12,7 +10,10 @@ import {
   ScrollView,
   StatusBar,
   Alert,
+  Switch,
+  Platform,
 } from 'react-native';
+import {check, PERMISSIONS, request, RESULTS} from 'react-native-permissions';
 
 import MCReactModule, {CustomEvent} from 'react-native-marketingcloudsdk';
 import Toast from 'react-native-root-toast';
@@ -37,6 +38,9 @@ const App = () => {
         <Section title="Logging">
           <Logging />
         </Section>
+        <Section title="Runtime Feature Toggle">
+          <FeatureToggle />
+        </Section>
       </ScrollView>
     </SafeAreaView>
   );
@@ -48,9 +52,18 @@ const Push = () => {
 
   const requestNotificationPermission = async () => {
     try {
-      await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATION,
-      );
+      if (Platform.OS === 'android') {
+
+      let checkPerm = await check(PERMISSIONS.ANDROID.POST_NOTIFICATIONS);
+        if(checkPerm != "granted"){
+          let result = await request(PERMISSIONS.ANDROID.POST_NOTIFICATIONS);
+          if (result === RESULTS.GRANTED) {
+            console.log('Notification permission granted');
+          } else {
+            console.log('Notification permission denied');
+          }
+        }
+      }
     } catch (err) {
       console.warn('requestNotificationPermission error: ', err);
     }
@@ -86,6 +99,7 @@ const Push = () => {
   useEffect(() => {
     updatePushData();
     requestNotificationPermission();
+    MCReactModule.enableLogging();
   }, []);
 
   return (
@@ -123,6 +137,12 @@ const Tags = () => {
       });
   };
 
+  const removeTag = async () => {
+    MCReactModule.removeTag(inputText);
+    setInputText('');
+    updateTags('Tag removed');
+  };
+
   const handleTags = async () => {
     MCReactModule.addTag(inputText);
     setInputText('');
@@ -150,6 +170,11 @@ const Tags = () => {
         onPress={() => updateTags('Tags updated')}>
         <Text style={styles.buttonText}>Get Tags</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity style={styles.button} onPress={removeTag}>
+        <Text style={styles.buttonText}>Remove Tag</Text>
+      </TouchableOpacity>
+
     </View>
   );
 };
@@ -300,6 +325,50 @@ const Attributes = () => {
   );
 };
 
+const FeatureToggle = () => {
+  const [isAnalyticsEnabled, setAnalyticsEnabledState] = useState(false);
+  const [isPiAnalyticsEnabled, setPiAnalyticsEnabledState] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setAnalyticsEnabledState(await MCReactModule.isAnalyticsEnabled());
+      setPiAnalyticsEnabledState(await MCReactModule.isPiAnalyticsEnabled());
+    };
+
+    fetchData();
+  }, []);
+
+  const toggleFeature = async (
+    featureName: string,
+    currentValue: boolean,
+    setterFunction: React.Dispatch<React.SetStateAction<boolean>>,
+    toggleFunction: (enabled: boolean) => void
+  ) => {
+    toggleFunction(!currentValue);
+    setterFunction(!currentValue);
+    Toast.show(`${featureName} is ${!currentValue ? 'Enabled' : 'Disabled'}`);
+  };
+
+  return (
+    <View style={styles.toggleContainer}>
+      <View style={styles.toggleRow}>
+        <Text style={styles.toggleLabel}>Analytics</Text>
+        <Switch
+          onValueChange={() => toggleFeature('Analytics', isAnalyticsEnabled, setAnalyticsEnabledState, MCReactModule.setAnalyticsEnabled)}
+          value={isAnalyticsEnabled}
+        />
+      </View>
+      <View style={styles.toggleRow}>
+        <Text style={styles.toggleLabel}>PI Analytics</Text>
+        <Switch
+          onValueChange={() => toggleFeature('PI Analytics', isPiAnalyticsEnabled, setPiAnalyticsEnabledState, MCReactModule.setPiAnalyticsEnabled)}
+          value={isPiAnalyticsEnabled}
+        />
+      </View>
+    </View>
+  );
+};
+
 const Logging = () => {
   const [deviceId, setDeviceId] = useState('');
 
@@ -399,17 +468,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F5FCFF',
+    color: '#000000',
   },
   section: {
     width: '100%',
     alignItems: 'center',
     marginBottom: 40,
     marginTop: 2,
+    color: '#000',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     alignItems: 'center',
+    color: '#000',
   },
   sectionContent: {
     width: '80%',
@@ -421,6 +493,7 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#FFF',
     marginBottom: 10,
+    color: '#000',
   },
   button: {
     backgroundColor: '#1A89CE',
@@ -444,6 +517,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginTop: 16,
     marginBottom: 20,
+    color: '#000000',
   },
   text: {
     fontSize: 16,
@@ -462,6 +536,23 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginTop: 10,
+  },
+  toggleContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
   },
 });
 

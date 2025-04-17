@@ -1,6 +1,6 @@
 // AppDelegate.m
 //
-// Copyright (c) 2023 Salesforce, Inc
+// Copyright (c) 2024 Salesforce, Inc
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -25,8 +25,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-
 #import "AppDelegate.h"
+
 #import <React/RCTBundleURLProvider.h>
 
 @implementation AppDelegate
@@ -37,7 +37,7 @@
   // You can add your custom initial props in the dictionary below.
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
-  
+
   // Configure the SFMC sdk ...
   PushConfigBuilder *pushConfigBuilder = [[PushConfigBuilder alloc] initWithAppId:@"{MC_APP_ID}"];
   [pushConfigBuilder setAccessToken:@"{MC_ACCESS_TOKEN}"];
@@ -59,6 +59,11 @@
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
 {
+  return [self bundleURL];
+}
+
+- (NSURL *)bundleURL
+{
 #if DEBUG
   return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
 #else
@@ -66,41 +71,39 @@
 #endif
 }
 
-/// This method controls whether the `concurrentRoot`feature of React18 is turned on or off.
-///
-/// @see: https://reactjs.org/blog/2022/03/29/react-v18.html
-/// @note: This requires to be rendering on Fabric (i.e. on the New Architecture).
-/// @return: `true` if the `concurrentRoot` feature is enabled. Otherwise, it returns `false`.
-- (BOOL)concurrentRootEnabled
-{
-  return true;
-}
-
 - (void)pushSetup {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    // set the UNUserNotificationCenter delegate - the delegate must be set here in
-    // didFinishLaunchingWithOptions
-    [UNUserNotificationCenter currentNotificationCenter].delegate = self;
-    [[SFMCSdk mp] setURLHandlingDelegate:self];
-    [[UIApplication sharedApplication] registerForRemoteNotifications];
-    
-    [[UNUserNotificationCenter currentNotificationCenter]
-     requestAuthorizationWithOptions:UNAuthorizationOptionAlert |
-     UNAuthorizationOptionSound |
-     UNAuthorizationOptionBadge
-     completionHandler:^(BOOL granted, NSError *_Nullable error) {
-      if (error == nil) {
-        if (granted == YES) {
-          NSLog(@"User granted permission");
-        }
-      }
+    // AppDelegate adheres to the SFMCSdkURLHandlingDelegate protocol
+    // and handles URLs passed back from the SDK in `sfmc_handleURL`.
+    // For more information, see https://salesforce-marketingcloud.github.io/MarketingCloudSDK-iOS/sdk-implementation/implementation-urlhandling.html
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+        [mp setURLHandlingDelegate:self];
     }];
-  });
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // set the UNUserNotificationCenter delegate - the delegate must be set here in
+        // didFinishLaunchingWithOptions
+        [UNUserNotificationCenter currentNotificationCenter].delegate = self;
+        [[UIApplication sharedApplication] registerForRemoteNotifications];
+        
+        [[UNUserNotificationCenter currentNotificationCenter]
+         requestAuthorizationWithOptions:UNAuthorizationOptionAlert |
+         UNAuthorizationOptionSound |
+         UNAuthorizationOptionBadge
+         completionHandler:^(BOOL granted, NSError *_Nullable error) {
+            if (error == nil) {
+                if (granted == YES) {
+                    NSLog(@"User granted permission");
+                }
+            }
+        }];
+    });
 }
 
 - (void)application:(UIApplication *)application
     didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
-    [[SFMCSdk mp] setDeviceToken:deviceToken];
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+        [mp setDeviceToken:deviceToken];
+    }];
 }
 
 - (void)application:(UIApplication *)application
@@ -115,8 +118,9 @@
     didReceiveNotificationResponse:(UNNotificationResponse *)response
              withCompletionHandler:(void (^)(void))completionHandler {
     // tell the MarketingCloudSDK about the notification
-    [[SFMCSdk mp] setNotificationRequest:response.notification.request];
-
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+        [mp setNotificationRequest:response.notification.request];
+    }];
     if (completionHandler != nil) {
         completionHandler();
     }
@@ -137,8 +141,9 @@
 - (void)application:(UIApplication *)application
     didReceiveRemoteNotification:(NSDictionary *)userInfo
           fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
-    [[SFMCSdk mp] setNotificationUserInfo:userInfo];
-
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+        [mp setNotificationUserInfo:userInfo];
+    }];
     completionHandler(UIBackgroundFetchResultNewData);
 }
 

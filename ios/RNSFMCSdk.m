@@ -26,31 +26,43 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #import "RNSFMCSdk.h"
-#import <SFMCSDK/SFMCSDK.h>
 #import <MarketingCloudSDK/MarketingCloudSDK.h>
+#import <SFMCSDK/SFMCSDK.h>
 #import "RCTConvert+SFMCEvent.h"
 
 const int LOG_LENGTH = 800;
 
 @implementation RNSFMCSdk
 
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        // Add default tag.
+        [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+          (void)[mp addTag:@"React"];
+        }];
+    }
+    return self;
+}
+
 - (dispatch_queue_t)methodQueue {
     return dispatch_get_main_queue();
 }
 
++ (BOOL)requiresMainQueueSetup {
+    return YES;
+}
+
 RCT_EXPORT_MODULE()
 
-- (void)log:(NSString *)msg {
-    if (@available(iOS 10, *)) {
-        if (self.logger == nil) {
-            self.logger = os_log_create("com.salesforce.marketingcloudsdk", "ReactNative");
-        }
-        os_log_info(self.logger, "%@", msg);
-    } else {
-        NSLog(@"%@", msg);
+- (void)log:(NSString*)msg {
+    if (self.logger == nil) {
+        self.logger = os_log_create("com.salesforce.marketingcloudsdk", "ReactNative");
     }
+    os_log_info(self.logger, "%{public}@", msg);
 }
-- (void)splitLog:(NSString *)msg {
+
+- (void)splitLog:(NSString*)msg {
     NSInteger length = msg.length;
     for (int i = 0; i < length; i += LOG_LENGTH) {
         NSInteger rangeLength = MIN(length - i, LOG_LENGTH);
@@ -58,44 +70,58 @@ RCT_EXPORT_MODULE()
     }
 }
 
-RCT_EXPORT_METHOD(logSdkState) {
-    [self splitLog:[SFMCSdk state]];
-}
+RCT_EXPORT_METHOD(logSdkState) { [self splitLog:[SFMCSdk state]]; }
 
 RCT_EXPORT_METHOD(getSystemToken
                   : (RCTPromiseResolveBlock)resolve rejecter
                   : (RCTPromiseRejectBlock)reject) {
-    NSString *deviceToken = [[SFMCSdk mp] deviceToken];
-    resolve(deviceToken);
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      NSString* deviceToken = [mp deviceToken];
+      resolve(deviceToken);
+    }];
 }
 
 RCT_EXPORT_METHOD(enableLogging) {
-    [SFMCSdk setLoggerWithLogLevel:SFMCSdkLogLevelDebug logOutputter:[[SFMCSdkLogOutputter alloc] init]];
+    [SFMCSdk setLoggerWithLogLevel:SFMCSdkLogLevelDebug
+                      logOutputter:[[SFMCSdkLogOutputter alloc] init]];
 }
 
 RCT_EXPORT_METHOD(disableLogging) {
-    [SFMCSdk setLoggerWithLogLevel:SFMCSdkLogLevelFault logOutputter:[[SFMCSdkLogOutputter alloc] init]];
+    [SFMCSdk setLoggerWithLogLevel:SFMCSdkLogLevelFault
+                      logOutputter:[[SFMCSdkLogOutputter alloc] init]];
 }
 
-RCT_EXPORT_METHOD(enablePush) { [[SFMCSdk mp] setPushEnabled:YES]; }
+RCT_EXPORT_METHOD(enablePush) {
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      [mp setPushEnabled:YES];
+    }];
+}
 
-RCT_EXPORT_METHOD(disablePush) { [[SFMCSdk mp] setPushEnabled:NO]; }
+RCT_EXPORT_METHOD(disablePush) {
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      [mp setPushEnabled:NO];
+    }];
+}
 
 RCT_EXPORT_METHOD(isPushEnabled
                   : (RCTPromiseResolveBlock)resolve rejecter
                   : (RCTPromiseRejectBlock)reject) {
-    BOOL status =  [[SFMCSdk mp] pushEnabled];
-    resolve(@(status));
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      BOOL status = [mp pushEnabled];
+      resolve(@(status));
+    }];
 }
 
 RCT_EXPORT_METHOD(getDeviceId
                   : (RCTPromiseResolveBlock)resolve rejecter
                   : (RCTPromiseRejectBlock)reject) {
-    NSString *deviceId = [[SFMCSdk mp] deviceIdentifier];
-    resolve(deviceId);
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      NSString* deviceId = [mp deviceIdentifier];
+      resolve(deviceId);
+    }];
 }
 
-RCT_EXPORT_METHOD(track:(NSDictionary* _Nonnull)eventJson) {
+RCT_EXPORT_METHOD(track : (NSDictionary* _Nonnull)eventJson) {
     [SFMCSdk trackWithEvent:[RCTConvert SFMCEvent:eventJson]];
 }
 
@@ -106,27 +132,35 @@ RCT_EXPORT_METHOD(setContactKey : (NSString* _Nonnull)contactKey) {
 RCT_EXPORT_METHOD(getContactKey
                   : (RCTPromiseResolveBlock)resolve rejecter
                   : (RCTPromiseRejectBlock)reject) {
-    NSString *contactKey = [[SFMCSdk mp] contactKey];
-    resolve(contactKey);
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      NSString* contactKey = [mp contactKey];
+      resolve(contactKey);
+    }];
 }
 
 RCT_EXPORT_METHOD(addTag : (NSString* _Nonnull)tag) {
-    [[SFMCSdk mp] addTag:tag];
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      [mp addTag:tag];
+    }];
 }
 
 RCT_EXPORT_METHOD(removeTag : (NSString* _Nonnull)tag) {
-    [[SFMCSdk mp] removeTag:tag];
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      [mp removeTag:tag];
+    }];
 }
 
 RCT_EXPORT_METHOD(getTags
                   : (RCTPromiseResolveBlock)resolve rejecter
                   : (RCTPromiseRejectBlock)reject) {
-    NSArray *tags = [[[SFMCSdk mp] tags] allObjects];
-    resolve(tags);
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      NSArray* tags = [[mp tags] allObjects];
+      resolve(tags);
+    }];
 }
 
 RCT_EXPORT_METHOD(setAttribute : (NSString* _Nonnull)name value : (NSString* _Nonnull)value) {
-    [[SFMCSdk identity] setProfileAttributes:@{name: value}];
+    [[SFMCSdk identity] setProfileAttributes:@{name : value}];
 }
 
 RCT_EXPORT_METHOD(clearAttribute : (NSString* _Nonnull)name) {
@@ -136,8 +170,41 @@ RCT_EXPORT_METHOD(clearAttribute : (NSString* _Nonnull)name) {
 RCT_EXPORT_METHOD(getAttributes
                   : (RCTPromiseResolveBlock)resolve rejecter
                   : (RCTPromiseRejectBlock)reject) {
-    NSDictionary *attributes = [[SFMCSdk mp] attributes];
-    resolve((attributes != nil) ? attributes : @[]);
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      NSDictionary* attributes = [mp attributes];
+      resolve((attributes != nil) ? attributes : @[]);
+    }];
+}
+
+RCT_EXPORT_METHOD(setAnalyticsEnabled : (BOOL)analyticsEnabled) {
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      [mp setAnalyticsEnabled:analyticsEnabled];
+    }];
+}
+
+RCT_EXPORT_METHOD(isAnalyticsEnabled
+                  : (RCTPromiseResolveBlock)resolve rejecter
+                  : (RCTPromiseRejectBlock)reject) {
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      BOOL isEnabled = [mp isAnalyticsEnabled];
+      resolve(@(isEnabled));
+    }];
+}
+
+// PI Analytics Enablement
+RCT_EXPORT_METHOD(setPiAnalyticsEnabled : (BOOL)analyticsEnabled) {
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      [mp setPiAnalyticsEnabled:analyticsEnabled];
+    }];
+}
+
+RCT_EXPORT_METHOD(isPiAnalyticsEnabled
+                  : (RCTPromiseResolveBlock)resolve rejecter
+                  : (RCTPromiseRejectBlock)reject) {
+    [SFMCSdk requestPushSdk:^(id<PushInterface> _Nonnull mp) {
+      BOOL isEnabled = [mp isPiAnalyticsEnabled];
+      resolve(@(isEnabled));
+    }];
 }
 
 @end
